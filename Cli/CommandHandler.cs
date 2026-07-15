@@ -1,0 +1,133 @@
+﻿
+using System.CommandLine;
+using System.IO;
+using System.Linq;
+using System.Security.Cryptography;
+
+//ב.CommandHandler.cs – ה"מוח"
+//כאן נמצאת כל הלוגיקה. הוא מחולק לשתי פונקציות עיקריות:
+namespace Cli
+{
+    public static class CommandHandler
+    {
+        //1. פקודת ה-bundle(הביצוע
+        //התוכנה עושה את השלבים הבאים:
+        public static Command CreateBundleCommand()
+        {
+        //איסוף קבצים: היא מבקשת מהמחשב את רשימת כל הקבצים בתיקייה.
+        //סינון(Filtering): היא אומרת "רגע! אל תיקחי קבצים מתיקיית bin או obj (אלו תיקיות שהמחשב יוצר לעצמו, לא הקוד שלנו)".
+        //מיון(Sorting): היא מסדרת את הקבצים לפי שם או לפי סוג, כדי שלא יהיה בלגן.
+        //כתיבה: היא פותחת קובץ חדש(ה-Output) ומתחילה לכתוב פנימה: קודם את שם המחבר, ואז קובץ אחרי קובץ.
+        var outputOption = new Option<FileInfo>(new[] { "--output", "-o" }, "File path and name for the bundled file");
+            var languageOption = new Option<string>(new[] { "--language", "-l" }, "List of languages or 'all'") { IsRequired = true };
+            var noteOption = new Option<bool>(new[] { "--note", "-n" }, "Include source file path as a comment");
+            var sortOption = new Option<string>(new[] { "--sort", "-s" }, () => "name", "Sort files by 'name' or 'type'");
+            var removeEmptyLinesOption = new Option<bool>(new[] { "--remove-empty-lines", "-r" }, "Remove empty lines");
+            var authorOption = new Option<string>(new[] { "--author", "-a" }, "Name of the file author");
+
+            var bundleCommand = new Command("bundle", "Bundle code files to a single file");
+
+            bundleCommand.AddOption(outputOption);
+            bundleCommand.AddOption(languageOption);
+            bundleCommand.AddOption(noteOption);
+            bundleCommand.AddOption(sortOption);
+            bundleCommand.AddOption(removeEmptyLinesOption);
+            bundleCommand.AddOption(authorOption);
+
+            bundleCommand.SetHandler((output, languages, note, sort, removeEmpty, author) =>
+            {
+                ExecuteBundle(output, languages, note, sort, removeEmpty, author);
+            }, outputOption, languageOption, noteOption, sortOption, removeEmptyLinesOption, authorOption);
+
+            return bundleCommand;
+        }
+//        2. פקודת ה-create-rsp(העוזרת האישית)
+//במקום שתצטרכי להקליד כל פעם פקודה ארוכה בטרמינל עם המון הגדרות, הפונקציה הזו פשוט שואלת אותך שאלות.
+
+//היא לוקחת את התשובות שלך ושומרת אותן בתוך קובץ שנקרא bundle.rsp.
+
+//ככה, בפעם הבאה, את רק אומרת לתוכנה "@bundle.rsp" והיא כבר יודעת מה לעשות לבד.
+        public static Command CreateRspCommand()
+        {
+            var command = new Command("create-rsp", "Create a response file for the bundle command");
+
+            command.SetHandler(() =>
+            {
+                try
+                {
+                    Console.WriteLine("--- Response File Generator ---");
+                    Console.Write("Enter output file path (e.g. out.txt): ");
+                    var output = Console.ReadLine();
+                    Console.Write("Enter languages (e.g. 'cs,java' or 'all'): ");
+                    var languages = Console.ReadLine();
+                    Console.Write("Include source paths? (y/n): ");
+                    var note = Console.ReadLine()?.ToLower() == "y" ? "--note" : "";
+                    Console.Write("Sort by 'name' or 'type'? ");
+                    var sort = Console.ReadLine();
+                    var sortArg = !string.IsNullOrEmpty(sort) ? $"--sort {sort}" : "";
+                    Console.Write("Remove empty lines? (y/n): ");
+                    var removeEmpty = Console.ReadLine()?.ToLower() == "y" ? "--remove-empty-lines" : "";
+                    Console.Write("Author name: ");
+                    var author = Console.ReadLine();
+                    var authorArg = !string.IsNullOrEmpty(author) ? $"--author \"{author}\"" : "";
+
+                    var rspContent = $"bundle --output {output} --language {languages} {note} {sortArg} {removeEmpty} {authorArg}";
+                    rspContent = string.Join(" ", rspContent.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries));
+
+                    File.WriteAllText("bundle.rsp", rspContent);
+                    Console.WriteLine("\nSuccess! 'bundle.rsp' created. Run: dotnet run -- @bundle.rsp");
+                }
+                catch (Exception ex) { Console.WriteLine($"Error: {ex.Message}"); }
+            });
+
+            return command;
+        }
+        //"פונקציית ה-ExecuteBundle היא המנוע הלוגי של הכלי, המבצע סריקה רקורסיבית של מערכת הקבצים
+        // bin ו-obj), מסננת באופן אוטומטי תיקיות זמניות(כמו 
+        //ומאחדת את התוכן לקובץ יחיד תוך ביצוע מיון, הוספת הערות מקור וניקוי שורות ריקות
+        //בהתאם להגדרות המשתמש."
+        private static void ExecuteBundle(FileInfo output, string languages, bool note, string sort, bool removeEmpty, string author)
+        {
+            try
+            {
+                var currentDirectory = Directory.GetCurrentDirectory();
+                var allFiles = Directory.GetFiles(currentDirectory, "*.*", SearchOption.AllDirectories);
+                var filteredFiles = allFiles.Where(file =>
+                    !file.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar) &&
+                    !file.Contains(Path.DirectorySeparatorChar + "debug" + Path.DirectorySeparatorChar) &&
+                    !file.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar) &&
+                    (output == null || file != output.FullName)
+                ).ToList();
+
+                if (languages != "all")
+                {
+                    var extensions = languages.Split(',').Select(l => "." + l.Trim().ToLower()).ToList();
+                    filteredFiles = filteredFiles.Where(f => extensions.Contains(Path.GetExtension(f).ToLower())).ToList();
+                }
+
+                if (sort == "type")
+                    filteredFiles = filteredFiles.OrderBy(f => Path.GetExtension(f)).ThenBy(f => Path.GetFileName(f)).ToList();
+                else
+                    filteredFiles = filteredFiles.OrderBy(f => Path.GetFileName(f)).ToList();
+
+                using (var writer = new StreamWriter(output.FullName))
+                {
+                    if (!string.IsNullOrEmpty(author)) writer.WriteLine($"// Author: {author}");
+                    foreach (var file in filteredFiles)
+                    {
+                        if (note) writer.WriteLine($"// Source: {Path.GetFileName(file)}");
+                        var lines = File.ReadAllLines(file);
+                        foreach (var line in lines)
+                        {
+                            if (removeEmpty && string.IsNullOrWhiteSpace(line)) continue;
+                            writer.WriteLine(line);
+                        }
+                        writer.WriteLine();
+                    }
+                }
+                Console.WriteLine("Done!");
+            }
+            catch (Exception ex) { Console.WriteLine($"Error: {ex.Message}"); }
+        }
+    }
+}
