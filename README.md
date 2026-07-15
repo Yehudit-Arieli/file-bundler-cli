@@ -1,14 +1,33 @@
 # File Bundler CLI
 
-A .NET CLI tool that bundles code files into a single output file and sorts them by file type.
+A .NET CLI tool that bundles multiple source code files into a single output file with configurable filtering, sorting, and formatting options.
 
 ## Overview
 
-This command-line tool recursively scans the current directory, collects code files, and merges them into a single bundle file — saving the effort of manually copying and pasting from multiple files. Build folders (`bin`, `obj`, `debug`) are automatically excluded. Bundling behavior is fully configurable: which languages to include, how to sort the files, whether to strip empty lines, and whether to record each file's source path and an author name as comments.
+This command-line tool recursively scans a project directory, collects source code files, and combines them into a single output file. Generated folders (`bin`, `obj`, and `debug`) are automatically excluded.
 
-A second command, `create-rsp`, interactively builds a response file so the full `bundle` command doesn't need to be retyped every time.
+The bundling process is configurable, allowing you to:
+
+- filter files by programming language
+- sort files by name or file type
+- remove empty lines
+- include source file names as comments
+- add author information to the generated file
+
+The project also includes a `create-rsp` command that interactively generates a response file, making repeated executions much more convenient.
 
 Built with the [`System.CommandLine`](https://github.com/dotnet/command-line-api) library.
+
+## Features
+
+- Bundle multiple source files into a single output file
+- Filter by programming language
+- Sort files by name or type
+- Automatically ignore `bin`, `obj`, and `debug` folders
+- Remove empty lines
+- Include source file names as comments
+- Add author information
+- Generate reusable response files (`bundle.rsp`)
 
 ## Tech Stack
 
@@ -79,11 +98,11 @@ dotnet run -- @bundle.rsp
 
 ```
 Cli/
-├── Cli.csproj          # Project file
-├── Program.cs          # Entry point — registers the bundle and create-rsp commands
-├── CommandHandler.cs   # Command definitions and bundling logic
-├── bundle.rsp          # Example response file
-└── myBundle.txt         # Example bundled output
+├── Program.cs          # Application entry point
+├── CommandHandler.cs   # Command definitions and business logic
+├── Cli.csproj
+├── bundle.rsp          # Sample response file
+└── myBundle.txt        # Sample bundled output
 ```
 
 ## Notes
@@ -94,4 +113,4 @@ Cli/
 
 ## License
 
-This project currently has no license specified.
+This project is intended for educational purposes.
