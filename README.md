@@ -4,7 +4,7 @@ A .NET CLI tool that bundles multiple source code files into a single output fil
 
 ## Overview
 
-This command-line tool recursively scans a project directory, collects source code files, and combines them into a single output file. Generated folders (`bin`, `obj`, and `debug`) are automatically excluded.
+This command-line tool recursively scans the current directory, collects source code files, and combines them into a single output file. Generated folders (`bin`, `obj`, and `debug`) are automatically excluded.
 
 The bundling process is configurable, allowing you to:
 
@@ -34,6 +34,14 @@ Built with the [`System.CommandLine`](https://github.com/dotnet/command-line-api
 - **Language:** C#
 - **Framework:** .NET 8.0
 - **Library:** System.CommandLine
+
+## Concepts Demonstrated
+
+- Command-line application development
+- Recursive file system traversal
+- LINQ filtering and sorting
+- File reading and writing
+- Command-line argument parsing
 
 ## Getting Started
 
@@ -71,9 +79,15 @@ Optionally, publish the project and add the output folder to your system's `PATH
 | `--remove-empty-lines` | `-r` | No | `false` | Remove empty lines from source files before bundling. |
 | `--author` | `-a` | No | — | Author name, recorded as a comment at the top of the bundle. |
 
-Example:
+Example using all options:
 ```bash
-dotnet run -- bundle --output myBundle.txt --language all --note --author "Yehudit"
+dotnet run -- bundle \
+  --output myBundle.txt \
+  --language all \
+  --sort type \
+  --note \
+  --remove-empty-lines \
+  --author "Yehudit"
 ```
 
 Using short aliases:
